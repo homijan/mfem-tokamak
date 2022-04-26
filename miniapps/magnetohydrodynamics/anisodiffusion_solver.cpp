@@ -87,11 +87,11 @@ public:
     Vector B(2);
     Bfield.setB(transip, B);
     M.SetSize(2);
-    // kPara * BxB + kPerp * (I - BxB) = kPerp * I + (kPara - kPerp) * BxB
+    // kPara * BxB + kP/erp * (I - BxB) = kPerp * I + (kPara - kPerp) * BxB
     M(0, 0) = kPerp + (kPara - kPerp) * B(0) * B(0);
     M(0, 1) = (kPara - kPerp) * B(0) * B(1);
     M(1, 0) = (kPara - kPerp) * B(1) * B(0);
-    M(1, 1) = kPerp + (kPara - kPerp) * B(1) * B(1);  
+    M(1, 1) = kPerp + (kPara - kPerp) * B(1) * B(1); 
   }
 };
 
@@ -114,7 +114,8 @@ int main(int argc, char *argv[])
    double kappa = -1.0;
    double eta = 0.0;
    double kPerp = 1e-6;
-   bool visualization = 1;
+   bool visualization = 0;
+   bool save = 0;
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -140,6 +141,9 @@ int main(int argc, char *argv[])
    args.AddOption(&kPerp, "-kperp", "--k-perp", "Perpendicular conductivity ratio vs parallel conductivity.");
    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                   "--no-visualization",
+                  "Enable or disable GLVis visualization.");
+   args.AddOption(&save, "-save", "--save-files", "-no-save",
+                  "--no-save-files",
                   "Enable or disable GLVis visualization.");
    args.Parse();
    if (!args.Good())
@@ -168,13 +172,13 @@ int main(int argc, char *argv[])
    if (dim == 2)
    {
       orders[1] = order_y;
-      if (kappa < 0) kappa = order_x*order_y;
+      if (kappa < 0) kappa = (order_x+1)*(order_y+1);
    }
    if (dim == 3)
    { 
       orders[1] = order_y;
       orders[2] = order_z;
-      if (kappa < 0) kappa = order_x*order_y*order_z;
+      if (kappa < 0) kappa = (order_x+1)*(order_y+1)*(order_z+1);
    }
 
    // 4. Refine the serial mesh on all processors to increase the resolution. In
@@ -225,7 +229,7 @@ int main(int argc, char *argv[])
    ConstantCoefficient BC_cf(0.0);
    MagneticFieldTschirnhaussen Bfield(1.0);
    MatrixBxBCoefficient D_mcf(Bfield, 1e0, kPerp);
-   //ConstantCoefficient D_mcf(1.0);
+   // ConstantCoefficient D_mcf(1.0);
    FunctionCoefficient source_cf(TschirnhaussenSource_function);
    b->AddDomainIntegrator(new DomainLFIntegrator(source_cf));
    b->AddBdrFaceIntegrator(
@@ -283,7 +287,7 @@ int main(int argc, char *argv[])
    {
       CustomSolverMonitor monitor(pmesh, &x);
       GMRESSolver gmres(MPI_COMM_WORLD);
-      gmres.SetAbsTol(0.0);
+      gmres.SetAbsTol(0);
       gmres.SetRelTol(1e-12);
       gmres.SetMaxIter(500);
       gmres.SetKDim(10);
@@ -301,6 +305,7 @@ int main(int argc, char *argv[])
 
    // 13. Save the refined mesh and the solution in parallel. This output can
    //     be viewed later using GLVis: "glvis -np <np> -m mesh -g sol".
+   if (save)
    {
       ostringstream mesh_name, sol_name;
       mesh_name << "mesh." << setfill('0') << setw(6) << myid;

@@ -1,0 +1,6 @@
+- Using anisotropic element orders can greatly deteriorate AMG convergence.
+For isotropic problem, elements > 1 apart, e.g., 1 and 3, converence is bad.
+Combining orders 1 and 4 doesn't converge in 500 iteraitons. Orders one apart
+or equal converge on isotropic problem very fast. For even simple anisotropy,
+kperp = 1e-1, anisotropic orders increase iteraitons counts by 20x or more,
+even for combining 1,2 compared with 1,1 or 2,2.
