@@ -13,6 +13,7 @@
 #define MFEM_FE_L2
 
 #include "fe_base.hpp"
+#include "vector"
 
 namespace mfem
 {
@@ -144,6 +145,101 @@ public:
    virtual void CalcShape(const IntegrationPoint &ip, Vector &shape) const;
    virtual void CalcDShape(const IntegrationPoint &ip,
                            DenseMatrix &dshape) const;
+};
+
+
+/// Arbitrary order tensor L2 elements with anisotropic order
+class L2_AnisotropicTensorElement : public NodalFiniteElement
+{
+protected:
+   std::vector<Poly_1D::Basis*> basis1d;
+   int b_type;
+
+public:
+
+   /// 2d constructor
+   L2_AnisotropicTensorElement(int px, int py, const int btype) :
+      NodalFiniteElement(2, Geometry::SQUARE, (px+1)*(py+1),
+         std::max(px,py), FunctionSpace::Qk), b_type(btype)
+   { }
+
+   /// 3d constructor
+   L2_AnisotropicTensorElement(int px, int py, int pz, const int btype) :
+      NodalFiniteElement(3, Geometry::CUBE, (px+1)*(py+1)*(pz+1),
+         std::max(std::max(px,py),pz), FunctionSpace::Qk), b_type(btype)
+   { }
+
+   // TODO : modified from TensorBas isElement but does not work
+   // with array of basis functions . Unclear if we need anyways.
+   // const Poly_1D::Basis& GetBasis1D(int d) const
+   // { return basis1d[d]; }
+
+   static Geometry::Type GetTensorProductGeometry(int dim)
+   {
+     switch (dim)
+     {
+        case 2: return Geometry::SQUARE;
+        case 3: return Geometry::CUBE;
+        default:
+           MFEM_ABORT("invalid dimension: " << dim);
+           return Geometry::INVALID;
+     }
+   }
+
+   // TODO : copied from NodalTensorFiniteElement, may need to be changed
+   const DofToQuad &GetDofToQuad(const IntegrationRule &ir,
+                                 DofToQuad::Mode mode) const;
+
+   // TODO : Modified from NodalTensorFiniteElement, not 100% on correctness
+   virtual void SetMapType(const int map_type_);
+
+   // TODO : Modified from NodalTensorFiniteElement, not 100% on correctness
+   virtual void GetTransferMatrix(const FiniteElement &fe,
+                                  ElementTransformation &Trans,
+                                  DenseMatrix &I) const;
+};
+
+
+/// Arbitrary order L2 elements in 2D on a square, with anisotropic order
+class L2_AnisotropicQuadrilateralElement : public L2_AnisotropicTensorElement
+{
+private:
+#ifndef MFEM_THREAD_SAFE
+   mutable Vector shape_x, shape_y, dshape_x, dshape_y;
+#endif
+
+public:
+   /// Construct the L2_QuadrilateralElement of order @a p and BasisType @a btype
+   L2_AnisotropicQuadrilateralElement(const int px, const int py,
+                           const int btype = BasisType::GaussLegendre);
+   virtual void CalcShape(const IntegrationPoint &ip, Vector &shape) const;
+   virtual void CalcDShape(const IntegrationPoint &ip,
+                           DenseMatrix &dshape) const;
+   virtual void ProjectDelta(int vertex, Vector &dofs) const;
+   virtual void ProjectCurl(const FiniteElement &fe,
+                            ElementTransformation &Trans,
+                            DenseMatrix &curl) const
+   { ProjectCurl_2D(fe, Trans, curl); }
+};
+
+
+/// Arbitrary order L2 elements in 3D on a cube, with anisotropic order
+class L2_AnisotropicHexahedronElement : public L2_AnisotropicTensorElement
+{
+private:
+#ifndef MFEM_THREAD_SAFE
+   mutable Vector shape_x, shape_y, shape_z, dshape_x, dshape_y, dshape_z;
+#endif
+
+public:
+   /// Construct the L2_HexahedronElement of order @a p and BasisType @a btype
+   L2_AnisotropicHexahedronElement(const int px, const int py, const int pz,
+                     const int btype = BasisType::GaussLegendre);
+   virtual void CalcShape(const IntegrationPoint &ip, Vector &shape) const;
+   virtual void CalcDShape(const IntegrationPoint &ip,
+                           DenseMatrix &dshape) const;
+   // TODO : looked like a bug in standard hex function, waiting to clarify
+   // virtual void ProjectDelta(int vertex, Vector &dofs) const;
 };
 
 } // namespace mfem

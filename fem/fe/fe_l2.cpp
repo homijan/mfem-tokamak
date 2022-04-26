@@ -691,4 +691,260 @@ void L2_WedgeElement::CalcDShape(const IntegrationPoint &ip,
    }
 }
 
+L2_AnisotropicQuadrilateralElement::L2_AnisotropicQuadrilateralElement(
+   int px, int py, const int btype) :
+   L2_AnisotropicTensorElement(px, py, btype)
+{
+   orders[0] = px;
+   orders[1] = py;
+   basis1d.push_back(&poly1d.GetBasis(px, b_type));
+   basis1d.push_back(&poly1d.GetBasis(py, b_type));
+
+   const double *opx = poly1d.OpenPoints(px, b_type);
+   const double *opy = poly1d.OpenPoints(py, b_type);
+
+#ifndef MFEM_THREAD_SAFE
+   shape_x.SetSize(px + 1);
+   shape_y.SetSize(py + 1);
+   dshape_x.SetSize(px + 1);
+   dshape_y.SetSize(py + 1);
+#endif
+
+   for (int o = 0, j = 0; j <= px; j++)
+   {
+      for (int i = 0; i <= py; i++)
+      {
+         Nodes.IntPoint(o++).Set2(opx[i], opy[j]);
+      }
+   }
+}
+
+void L2_AnisotropicQuadrilateralElement::CalcShape(
+   const IntegrationPoint &ip, Vector &shape) const
+{
+   const int &px = orders[0];
+   const int &py = orders[1];
+#ifdef MFEM_THREAD_SAFE
+   Vector shape_x(px+1), shape_y(py+1);
+#endif
+
+   basis1d[0]->Eval(ip.x, shape_x);
+   basis1d[1]->Eval(ip.y, shape_y);
+
+   for (int o = 0, j = 0; j <= py; j++)
+   {
+      for (int i = 0; i <= px; i++)
+      {
+         shape(o++) = shape_x(i)*shape_y(j);
+      }
+   }
+}
+
+void L2_AnisotropicQuadrilateralElement::CalcDShape(
+   const IntegrationPoint &ip, DenseMatrix &dshape) const
+{
+   const int &px = orders[0];
+   const int &py = orders[1];
+#ifdef MFEM_THREAD_SAFE
+   Vector shape_x(px+1), shape_y(py+1), dshape_x(px+1), dshape_y(py+1);
+#endif
+
+   basis1d[0]->Eval(ip.x, shape_x, dshape_x);
+   basis1d[1]->Eval(ip.y, shape_y, dshape_y);
+
+   for (int o = 0, j = 0; j <= py; j++)
+   {
+      for (int i = 0; i <= px; i++)
+      {
+         dshape(o,0) = dshape_x(i)* shape_y(j);
+         dshape(o,1) =  shape_x(i)*dshape_y(j);  o++;
+      }
+   }
+}
+
+void L2_AnisotropicQuadrilateralElement::ProjectDelta(
+   int vertex, Vector &dofs) const
+{
+   const int &px = orders[0];
+   const int &py = orders[1];
+   const double *opx = poly1d.OpenPoints(px, b_type);
+   const double *opy = poly1d.OpenPoints(py, b_type);
+
+#ifdef MFEM_THREAD_SAFE
+   Vector shape_x(px+1), shape_y(py+1);
+#endif
+
+   for (int i = 0; i <= px; i++)
+   {
+      shape_x(i) = poly1d.CalcDelta(px,(1.0 - opx[i]));
+   }
+   for (int i = 0; i <= py; i++)
+   {
+      shape_y(i) = poly1d.CalcDelta(py,opy[i]);
+   }
+
+   switch (vertex)
+   {
+      case 0:
+         for (int o = 0, j = 0; j <= px; j++)
+            for (int i = 0; i <= px; i++)
+            {
+               dofs[o++] = shape_x(i)*shape_x(j);
+            }
+         break;
+      case 1:
+         for (int o = 0, j = 0; j <= px; j++)
+            for (int i = 0; i <= py; i++)
+            {
+               dofs[o++] = shape_y(i)*shape_x(j);
+            }
+         break;
+      case 2:
+         for (int o = 0, j = 0; j <= py; j++)
+            for (int i = 0; i <= py; i++)
+            {
+               dofs[o++] = shape_y(i)*shape_y(j);
+            }
+         break;
+      case 3:
+         for (int o = 0, j = 0; j <= py; j++)
+            for (int i = 0; i <= px; i++)
+            {
+               dofs[o++] = shape_x(i)*shape_y(j);
+            }
+         break;
+   }
+}
+
+L2_AnisotropicHexahedronElement::L2_AnisotropicHexahedronElement(
+   int px, int py, int pz, const int btype) :
+   L2_AnisotropicTensorElement(px, py, pz, btype)
+{
+   orders[0] = px;
+   orders[1] = py;
+   orders[2] = pz;
+   basis1d.push_back(&poly1d.GetBasis(px, b_type));
+   basis1d.push_back(&poly1d.GetBasis(py, b_type));
+   basis1d.push_back(&poly1d.GetBasis(pz, b_type));
+
+   const double *opx = poly1d.OpenPoints(px, b_type);
+   const double *opy = poly1d.OpenPoints(py, b_type);
+   const double *opz = poly1d.OpenPoints(pz, b_type);
+
+#ifndef MFEM_THREAD_SAFE
+   shape_x.SetSize(px + 1);
+   shape_y.SetSize(py + 1);
+   shape_z.SetSize(pz + 1);
+   dshape_x.SetSize(px + 1);
+   dshape_y.SetSize(py + 1);
+   dshape_z.SetSize(pz + 1);
+#endif
+
+   for (int o = 0, k = 0; k <= pz; k++)
+      for (int j = 0; j <= py; j++)
+         for (int i = 0; i <= px; i++)
+         {
+            Nodes.IntPoint(o++).Set3(opx[i], opy[j], opz[k]);
+         }
+}
+
+void L2_AnisotropicHexahedronElement::CalcShape(const IntegrationPoint &ip,
+                                     Vector &shape) const
+{
+   const int &px = orders[0];
+   const int &py = orders[1];
+   const int &pz = orders[2];
+
+#ifdef MFEM_THREAD_SAFE
+   Vector shape_x(px+1), shape_y(py+1), shape_z(pz+1);
+#endif
+
+   basis1d[0]->Eval(ip.x, shape_x);
+   basis1d[1]->Eval(ip.y, shape_y);
+   basis1d[2]->Eval(ip.z, shape_z);
+
+   for (int o = 0, k = 0; k <= pz; k++)
+      for (int j = 0; j <= py; j++)
+         for (int i = 0; i <= px; i++)
+         {
+            shape(o++) = shape_x(i)*shape_y(j)*shape_z(k);
+         }
+}
+
+void L2_AnisotropicHexahedronElement::CalcDShape(const IntegrationPoint &ip,
+                                      DenseMatrix &dshape) const
+{
+   const int &px = orders[0];
+   const int &py = orders[1];
+   const int &pz = orders[2];
+
+#ifdef MFEM_THREAD_SAFE
+   Vector shape_x(px+1),  shape_y(py+1),  shape_z(pz+1);
+   Vector dshape_x(px+1), dshape_y(py+1), dshape_z(pz+1);
+#endif
+
+   basis1d[0]->Eval(ip.x, shape_x, dshape_x);
+   basis1d[1]->Eval(ip.y, shape_y, dshape_y);
+   basis1d[2]->Eval(ip.z, shape_z, dshape_z);
+
+   for (int o = 0, k = 0; k <= pz; k++)
+      for (int j = 0; j <= py; j++)
+         for (int i = 0; i <= px; i++)
+         {
+            dshape(o,0) = dshape_x(i)* shape_y(j)* shape_z(k);
+            dshape(o,1) =  shape_x(i)*dshape_y(j)* shape_z(k);
+            dshape(o,2) =  shape_x(i)* shape_y(j)*dshape_z(k);  o++;
+         }
+}
+
+// TODO : copied from NodalTensorFiniteElement, may need to be changed
+const DofToQuad &L2_AnisotropicTensorElement::GetDofToQuad(
+   const IntegrationRule &ir, DofToQuad::Mode mode) const
+{
+   return  ScalarFiniteElement::GetDofToQuad(ir, mode);
+
+   // TODO : potentially reimplement GetTensorDofToQuad for L2_AnisotropicTensorElement?
+   // return (mode == DofToQuad::FULL) ?
+   //        ScalarFiniteElement::GetDofToQuad(ir, mode) :
+   //        ScalarFiniteElement::GetTensorDofToQuad(*this, ir, mode);
+}
+
+// TODO : Modified from NodalTensorFiniteElement, not 100% on correctness
+void L2_AnisotropicTensorElement::SetMapType(const int map_type_)
+{
+   ScalarFiniteElement::SetMapType(map_type);
+   // If we are using the "integrated" basis, the basis functions should be
+   // scaled for MapType::VALUE, and not scaled for MapType::INTEGRAL. This
+   // ensures spectral equivalence of the mass matrix with its low-order-refined
+   // counterpart (cf. LORDiscretization)
+   for (int d=0; d<dim; d++)
+   {
+      if (basis1d[d]->IsIntegratedType())
+      {
+         basis1d[d]->ScaleIntegrated(map_type == VALUE);
+      }
+   }
+}
+
+// TODO : Modified from NodalTensorFiniteElement, not 100% on correctness
+void L2_AnisotropicTensorElement::GetTransferMatrix(
+   const FiniteElement &fe, ElementTransformation &Trans,
+   DenseMatrix &I) const
+{
+   bool int_type = false;
+   for (int d=0; d<dim; d++)
+   {
+      if (basis1d[d]->IsIntegratedType()) int_type = true;
+   }
+   if (int_type)
+   {
+      CheckScalarFE(fe).ScalarLocalInterpolation(Trans, I, *this);
+   }
+   else
+   {
+      NodalFiniteElement::GetTransferMatrix(fe, Trans, I);
+   }
+}
+
+
 }

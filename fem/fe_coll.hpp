@@ -1268,6 +1268,56 @@ public:
    virtual int GetContType() const { return DISCONTINUOUS; }
 };
 
+/// "L2-conforming" discontinuous tensor elements with arbitrary anisotropic order
+class L2_AnisotropicFECollection : public FiniteElementCollection
+{
+private:
+   int dim;
+   Array<int> orders;
+   int b_type; // BasisType
+   int m_type; // map type
+   char d_name[32];
+   ScalarFiniteElement *L2_Elements[Geometry::NumGeom];
+   ScalarFiniteElement *Tr_Elements[Geometry::NumGeom];  // ***Not implemented***
+   int *OtherDofOrd;   // for rotating other types of elements (for Or == 0)
+
+public:
+   L2_AnisotropicFECollection(const Array<int> &orders_,
+                   const int btype = BasisType::GaussLegendre,
+                   const int map_type = FiniteElement::VALUE);
+
+   virtual const FiniteElement *FiniteElementForGeometry(
+      Geometry::Type GeomType) const;
+   virtual int DofForGeometry(Geometry::Type GeomType) const
+   {
+      if (L2_Elements[GeomType])
+      {
+         return L2_Elements[GeomType]->GetDof();
+      }
+      return 0;
+   }
+   virtual const int *DofOrderForOrientation(Geometry::Type GeomType,
+                                             int Or) const;
+   virtual const char *Name() const { return d_name; }
+
+   virtual int GetContType() const { return DISCONTINUOUS; }
+
+   virtual const FiniteElement *TraceFiniteElementForGeometry(
+      Geometry::Type GeomType) const
+   {
+      mfem_error("Trace elements not implemented for anisotropic elements!");
+      return NULL; // Avoid compiler warnings
+   }
+
+   int GetBasisType() const { return b_type; }
+
+   FiniteElementCollection* Clone(int p) const
+   { return new L2_AnisotropicFECollection(orders, b_type, m_type); }
+
+   virtual ~L2_AnisotropicFECollection();
+};
+
+
 }
 
 #endif

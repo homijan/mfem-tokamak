@@ -104,10 +104,12 @@ int main(int argc, char *argv[])
    Hypre::Init();
 
    // 2. Parse command-line options.
-   const char *mesh_file = "../data/star.mesh";
+   const char *mesh_file = "../../data/beam-quad.mesh";
    int ser_ref_levels = 1;
    int par_ref_levels = 0;
-   int order = 3;
+   int order_x = 3;
+   int order_y = -1;
+   int order_z = -1;
    double sigma = -1.0;
    double kappa = -1.0;
    double eta = 0.0;
@@ -122,8 +124,12 @@ int main(int argc, char *argv[])
                   " -1 for auto.");
    args.AddOption(&par_ref_levels, "-rp", "--refine-parallel",
                   "Number of times to refine the mesh uniformly in parallel.");
-   args.AddOption(&order, "-o", "--order",
-                  "Finite element order (polynomial degree) >= 0.");
+   args.AddOption(&order_x, "-ox", "--order-x",
+                  "Finite element order in x dimension (polynomial degree) >= 0.");
+   args.AddOption(&order_y, "-oy", "--order-y",
+                  "Finite element order in y dimension (polynomial degree) >= 0 (-1 sets equal to ox).");
+   args.AddOption(&order_z, "-oz", "--order-z",
+                  "Finite element order in z dimension (polynomial degree) >= 0 (-1 sets equal to ox).");
    args.AddOption(&sigma, "-s", "--sigma",
                   "One of the three DG penalty parameters, typically +1/-1."
                   " See the documentation of class DGDiffusionIntegrator.");
@@ -144,20 +150,32 @@ int main(int argc, char *argv[])
       }
       return 1;
    }
-   if (kappa < 0)
-   {
-      kappa = (order+1)*(order+1);
-   }
    if (myid == 0)
    {
       args.PrintOptions(cout);
    }
+   if (order_y < 0) order_y = order_x;
+   if (order_z < 0) order_z = order_x;
 
    // 3. Read the (serial) mesh from the given mesh file on all processors. We
    //    can handle triangular, quadrilateral, tetrahedral and hexahedral meshes
    //    with the same code. NURBS meshes are projected to second order meshes.
    Mesh *mesh = new Mesh(mesh_file, 1, 1);
    int dim = mesh->Dimension();
+
+   Array<int> orders(dim);
+   orders[0] = order_x;
+   if (dim == 2)
+   {
+      orders[1] = order_y;
+      if (kappa < 0) kappa = order_x*order_y;
+   }
+   if (dim == 3)
+   { 
+      orders[1] = order_y;
+      orders[2] = order_z;
+      if (kappa < 0) kappa = order_x*order_y*order_z;
+   }
 
    // 4. Refine the serial mesh on all processors to increase the resolution. In
    //    this example we do 'ser_ref_levels' of uniform refinement. By default,
@@ -175,7 +193,7 @@ int main(int argc, char *argv[])
    }
    if (mesh->NURBSext)
    {
-      mesh->SetCurvature(max(order, 1));
+      mesh->SetCurvature(max(orders.Max(), 1));
    }
 
    // 5. Define a parallel mesh by a partitioning of the serial mesh. Refine
@@ -192,7 +210,8 @@ int main(int argc, char *argv[])
 
    // 6. Define a parallel finite element space on the parallel mesh. Here we
    //    use discontinuous finite elements of the specified order >= 0.
-   FiniteElementCollection *fec = new DG_FECollection(order, dim);
+   // FiniteElementCollection *fec = new L2_FECollection(order_x, dim);
+   FiniteElementCollection *fec = new L2_AnisotropicFECollection(orders, BasisType::GaussLobatto);
    ParFiniteElementSpace *fespace = new ParFiniteElementSpace(pmesh, fec);
    HYPRE_BigInt size = fespace->GlobalTrueVSize();
    if (myid == 0)
@@ -251,10 +270,10 @@ int main(int argc, char *argv[])
    // 11. Depending on the symmetry of A, define and apply a parallel PCG or
    //     GMRES solver for AX=B using the BoomerAMG preconditioner from hypre.
    HypreSolver *amg = new HypreBoomerAMG(*A);
-   if (sigma == -1.0)
+   if (sigma == -1.0 && 0)
    {
       HyprePCG pcg(*A);
-      pcg.SetTol(1e-12);
+      pcg.SetTol(1e-16);
       pcg.SetMaxIter(5000);
       pcg.SetPrintLevel(2);
       pcg.SetPreconditioner(*amg);

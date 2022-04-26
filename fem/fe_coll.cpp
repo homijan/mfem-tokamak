@@ -3413,4 +3413,111 @@ FiniteElementCollection *NURBSFECollection::GetTraceCollection() const
    return NULL;
 }
 
+
+L2_AnisotropicFECollection::L2_AnisotropicFECollection(
+   const Array<int> &orders_, const int btype, const int map_type)
+   : FiniteElementCollection(orders_.Max()),
+   orders(orders_),
+   dim(orders_.Size()),
+   m_type(map_type)
+{
+   MFEM_VERIFY(orders_.Min() >= 0, "L2_AnisotropicFECollection requires order >= 0.");
+
+   b_type = BasisType::Check(btype);
+   const char *prefix = NULL;
+   switch (map_type)
+   {
+      case FiniteElement::VALUE:    prefix = "L2";    break;
+      case FiniteElement::INTEGRAL: prefix = "L2Int"; break;
+      default:
+         MFEM_ABORT("invalid map_type: " << map_type);
+   }
+   switch (btype)
+   {
+      case BasisType::GaussLegendre:
+         snprintf(d_name, 32, "%s_%dD_P%d-%d", prefix, dim,
+            orders_.Min(), orders_.Max());
+         break;
+      default:
+         snprintf(d_name, 32, "%s_T%d_%dD_P%d-%d", prefix,
+            btype, dim, orders_.Min(), orders_.Max());
+   }
+
+   if (b_type == BasisType::Positive)
+   {
+      mfem_error("L2_AnisotropicFECollection not implemented for this basis.");
+   }
+
+   for (int g = 0; g < Geometry::NumGeom; g++)
+   {
+      L2_Elements[g] = NULL;
+      Tr_Elements[g] = NULL;
+   }
+   OtherDofOrd = NULL;
+
+   if (dim == 2)
+   {
+      L2_Elements[Geometry::SQUARE] = new 
+         L2_AnisotropicQuadrilateralElement(orders_[0], orders_[1], btype);
+      L2_Elements[Geometry::SQUARE]->SetMapType(map_type);
+      const int QuadDof = L2_Elements[Geometry::SQUARE]->GetDof();
+      OtherDofOrd = new int[QuadDof];
+      for (int j = 0; j < QuadDof; j++)
+      {
+         OtherDofOrd[j] = j; // for Or == 0
+      }
+   }
+   else if (dim == 3)
+   {
+      L2_Elements[Geometry::CUBE] = new
+         L2_AnisotropicHexahedronElement(orders_[0], orders_[1],
+            orders_[2], btype);
+      L2_Elements[Geometry::CUBE]->SetMapType(map_type);
+      const int HexDof = L2_Elements[Geometry::CUBE]->GetDof();
+
+      OtherDofOrd = new int[HexDof];
+      for (int j = 0; j < HexDof; j++)
+      {
+         OtherDofOrd[j] = j; // for Or == 0
+      }
+   }
+   else
+   {
+      mfem::err << "L2_AnisotropicFECollection::L2_AnisotropicFECollection : dim = "
+                << dim << endl;
+      mfem_error();
+   }
+}
+
+const FiniteElement *
+L2_AnisotropicFECollection::FiniteElementForGeometry(Geometry::Type GeomType) const
+{
+   if (GeomType == Geometry::SQUARE || GeomType == Geometry::CUBE)
+   {
+      return L2_Elements[GeomType];
+   }
+   else
+   {
+      MFEM_ABORT("L2_AnisotropicFECollection only supports 2d/3d tensor elements.");
+      return NULL;
+   }
+}
+
+const int *L2_AnisotropicFECollection::DofOrderForOrientation(Geometry::Type GeomType,
+                                                   int Or) const
+{
+   return (Or == 0) ? OtherDofOrd : NULL;
+}
+
+L2_AnisotropicFECollection::~L2_AnisotropicFECollection()
+{
+   delete [] OtherDofOrd;
+   for (int i = 0; i < Geometry::NumGeom; i++)
+   {
+      delete L2_Elements[i];
+      delete Tr_Elements[i];
+   }
+}
+
+
 }
