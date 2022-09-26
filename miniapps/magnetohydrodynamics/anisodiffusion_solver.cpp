@@ -104,12 +104,12 @@ int main(int argc, char *argv[])
    Hypre::Init();
 
    // 2. Parse command-line options.
-   const char *mesh_file = "../data/star.mesh";
+   const char *mesh_file = "data/pulpo-meshes/mesh-pulpoSquare-o9-l10.mesh";
    int ser_ref_levels = 1;
    int par_ref_levels = 0;
    int order = 3;
    double sigma = -1.0;
-   double kappa = -1.0;
+   double kappa = 1e2;//-1.0; // B-aligned mesh needs strong penalty.
    double eta = 0.0;
    double kPerp = 1e-6;
    bool visualization = 1;

@@ -21,9 +21,6 @@ CONFIG_MK = $(MFEM_BUILD_DIR)/config/config.mk
 MFEM_LIB_FILE = mfem_is_not_built
 -include $(CONFIG_MK)
 
-ANISO_SOLVERS_SRC = anisodiffusion_solver.cpp
-ANISO_SOLVERS_OBJ = $(ANISO_SOLVERS_SRC:.cpp=.o)
-
 SEQ_MINIAPPS = 
 PAR_MINIAPPS = anisodiffusion_solver
 
